@@ -1,0 +1,187 @@
+%clearvars;
+addpath("data/");
+prj = 'five_groups_with_oxy';
+%%
+d = importdata('cluster_list_selected.txt');
+clstr_list = d.data;
+
+[clstr_list_sorted, id_sort] = sort(clstr_list,'ascend');
+
+load('latitude')%
+load('longitude')%
+
+% DEPTH
+load('depth.mat')
+depth = depth(1:100);
+if(size(depth,2)>1)
+    depth = depth';
+end
+
+d = importdata('contribution_com1.txt');
+alpha1 = d.data;
+alpha1 = alpha1(clstr_list_sorted);
+alpha1_reg = alpha1';
+
+d = importdata('contribution_com3.txt');
+alpha3 = d.data;
+alpha3 = alpha3(clstr_list_sorted);
+
+
+alpha2 = 1 - alpha1 - alpha3;
+
+
+
+load(['P_com4_' prj]) % p
+load(['P_com5_' prj]) %q
+
+    q(85) = 0.9998;
+    q(91) = 0.3;
+    q(92) = 0.5;
+    q(93)=0.9;
+    q(95) = 0.6;
+    q(98) = 0.1;
+    q(99) = 0.1;
+    q(97) = 0.1;
+    
+
+alpha2_reg = alpha2' .* q; % Shallow Mig
+alpha4_reg = alpha2' .* (1-q); %Deep Mig
+alpha3_reg = alpha3' .* p; % Shallow Res
+alpha5_reg = alpha3' .* (1-p); % Deep Res
+
+com_prop = [alpha1'; alpha2_reg; alpha3_reg;alpha4_reg;alpha5_reg];
+
+var_cum = zeros(1,length(clstr_list_sorted));
+
+load('day_sa_m_NoNorm.mat')
+load('night_sa_m_NoNorm.mat')
+
+sa_d_t = nansum(day_sa_m(:,clstr_list_sorted)); % integrated over z
+sa_n_t = nansum(night_sa_m(:,clstr_list_sorted));
+
+% Lissage
+sa_lis = movmean(sa_d_t,5);
+
+for i=1:5
+    eval(['var = sa_lis .* alpha' num2str(i) '_reg;'])
+    
+    var_cum = [var_cum; var_cum(i,:) + var];
+
+end
+
+var_cum(1,:) = [];
+% 
+% v = var_cum(5,:);
+% var_cum(5,:) = var_cum(4,:); % Deep Res
+% var_cum(4,:) = v; % Deep Mig
+% 
+% v = com_prop(5,:);
+% com_prop(5,:) = com_prop(4,:);
+% com_prop(4,:) = v;
+
+
+x_fill = [1:length(clstr_list_sorted),length(clstr_list_sorted):-1:1 ];
+
+figure('Renderer', 'painters', 'Position', [20 30 1200 500])
+
+ax1 = subplot(101, 1, 1:2); % top row of the 3x3 grid
+ax1.YLim = [0,1];
+
+ax2 =subplot(101, 1, 3:101); 
+
+gca = subplot_tight(1,1,1,[0.15, 0.08]);
+
+colorOrder = get(gca,'colororder');
+colorOrder(1,:) = [255,215,0]/255;
+colorOrder(2,:) = [145,212,194]/255;
+colorOrder(3,:) = [255,102,178]/255;
+colorOrder(5,:) = [255,204,229]/255;
+colorOrder(4,:) = [175,238,238]/255;
+%subplot(211)
+
+legend_lab = {'Deep Res','Deep Mig','Shallow Res','Shallow Mig','Epi','Location','north'};
+
+id_oc = sort([15 30 55 71 82 100]);
+id_oc_mean = mean([[0,id_oc]; [id_oc, 122]]);
+
+ylim([0 5000])
+
+
+for i=5:-1:1
+    y_fill = [zeros(1,length(clstr_list_sorted)),var_cum(i,end:-1:1)];
+
+    f(i) = fill(x_fill,y_fill,colorOrder(i,:),'EdgeColor','none', 'DisplayName',legend_lab{5-i+1});
+
+    hold on
+
+end
+
+for i=1:length(id_oc)
+    f(5+i) = plot([id_oc(i) id_oc(i)],ylim,'--k','LineWidth',0.5);
+end
+
+xlim([1 length(clstr_list_sorted)])
+
+
+% 
+ lgd = legend(f(1:5));
+ lgd.Location = "northwest";
+ lgd.Box="off" ;
+ lgd.FontSize = 12;
+
+%% 
+
+ 
+leg = {'North', 'South', 'South', 'South', 'Nwest.','Neast.','North' ;...
+    'Atlantic', 'Atlantic', 'Indian', 'Pacific','Pacific.','Pacific','Atlantic'};
+
+set(gca,'XTick',[])
+
+for ii = 1:length(leg)
+      h(ii)=text(gca, id_oc_mean(ii), -500, sprintf('%s\n%s\n', leg{:,ii}), ...
+            'horizontalalignment', 'center', 'verticalalignment', 'middle');
+      set(h(ii),'Rotation',45,'FontSize',12); %rotating the x label
+end
+
+ylabel('Acoustic signal', 'FontSize',12)
+
+%%
+ax2.Position = get(gca, 'position');
+set(ax2,'xtick',[],'ytick',[])
+
+
+load('id_')
+load('id_over_est')
+load('id_under_est')
+
+col = cell(1,122);
+for i=1:length(id_)
+    col{id_(i)} = [75 0 130]/225;
+end
+
+for i=1:length(id_over_est)
+    col{id_over_est(i)} = [0 86 27]/225;
+end
+
+for i=1:length(id_under_est)
+    col{id_under_est(i)} = [1 0 0];
+end
+
+
+ax1.InnerPosition(1) = gca.InnerPosition(1);
+ax1.InnerPosition(3) = gca.InnerPosition(3);
+
+ for i=1:122
+    
+     fill(ax1,[i, i+1, i+1, i],[0, 0, 1, 1],col{i},'EdgeColor','k','linewidth',0.5,'FaceAlpha',0.8)
+     hold(ax1,"on") 
+ end
+ ax1.XLim = [1,122];
+ set(ax1,'xtick',[])
+ set(ax1,'ytick',[],'box','on')
+
+ title(ax1,"(a) Contribution of the 5 communities to acoustic signal along the Malaspina transect",'FontSize',13)
+
+
+
+
