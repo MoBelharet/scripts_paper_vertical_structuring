@@ -65,6 +65,7 @@ if(plot_fig2_c_d_e)
     clearvars -except plot_fig* add_simple_model;
     addpath data/
     addpath functions/
+    addpath functions/subplot_tight/
     addpath src/
 
     add_simple_model = 0;
@@ -214,7 +215,7 @@ if(plot_fig6)
     addpath functions/
     addpath src/
 
-    
+
     figure6
 
     
